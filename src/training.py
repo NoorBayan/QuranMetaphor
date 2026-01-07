@@ -168,13 +168,18 @@ class MetaphorTrainer:
 
     def evaluate(self, loader, label_maps):
         """
-        Runs evaluation and returns strict metrics.
+        Runs evaluation with LOGICAL CONSISTENCY ENFORCEMENT.
         """
         self.model.eval()
         
-        # Containers for accumulation
         preds = {'Type': [], 'Origin': [], 'Context': []}
         trues = {'Type': [], 'Origin': [], 'Context': []}
+
+        # 1. Get Null Indices from Label Maps to apply logic
+        # Assuming structure: {'Explicit':0, ..., 'Null': 2}
+        type_null_idx = label_maps['Type'].get('Null', label_maps['Type'].get('Empty', 2))
+        origin_null_idx = label_maps['Origin'].get('Null', label_maps['Origin'].get('Empty', 2))
+        context_null_idx = label_maps['Context'].get('Null', label_maps['Context'].get('Empty', 3))
 
         with torch.no_grad():
             for batch in loader:
@@ -184,22 +189,40 @@ class MetaphorTrainer:
 
                 l_type, l_origin, l_context, _ = self.model(ids, mask, meta_mask)
 
-                # Get Predictions (Argmax)
-                preds['Type'].extend(torch.argmax(l_type, dim=1).cpu().numpy())
-                preds['Origin'].extend(torch.argmax(l_origin, dim=1).cpu().numpy())
-                preds['Context'].extend(torch.argmax(l_context, dim=1).cpu().numpy())
+                # Get Raw Predictions
+                p_type = torch.argmax(l_type, dim=1)
+                p_origin = torch.argmax(l_origin, dim=1)
+                p_context = torch.argmax(l_context, dim=1)
 
-                # Get True Labels
+                # ===================================================
+                # 🔥 LOGICAL CONSISTENCY FIX (POST-PROCESSING)
+                # ===================================================
+                # Rule: If Type is Null, force Origin and Context to be Null
+                
+                # Create a mask where Type prediction is Null
+                is_null_mask = (p_type == type_null_idx)
+                
+                # Override inconsistent predictions
+                p_origin[is_null_mask] = origin_null_idx
+                p_context[is_null_mask] = context_null_idx
+                # ===================================================
+
+                # Save finalized predictions
+                preds['Type'].extend(p_type.cpu().numpy())
+                preds['Origin'].extend(p_origin.cpu().numpy())
+                preds['Context'].extend(p_context.cpu().numpy())
+
                 trues['Type'].extend(batch['labels']['type'].cpu().numpy())
                 trues['Origin'].extend(batch['labels']['origin'].cpu().numpy())
                 trues['Context'].extend(batch['labels']['context'].cpu().numpy())
 
+        # ... (Rest of the function remains the same: Compute Metrics) ...
+        
         # Compute Metrics
         res_type, f1_type = calculate_strict_metrics(trues['Type'], preds['Type'], label_maps['Type'])
         res_origin, f1_origin = calculate_strict_metrics(trues['Origin'], preds['Origin'], label_maps['Origin'])
         res_context, f1_context = calculate_strict_metrics(trues['Context'], preds['Context'], label_maps['Context'])
 
-        # Overall Average Score
         avg_strict_f1 = (f1_type + f1_origin + f1_context) / 3.0
 
         return {
