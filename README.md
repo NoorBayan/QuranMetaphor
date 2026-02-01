@@ -5,9 +5,6 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](./LICENSE)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://drive.google.com/file/d/1n9dCxSFWBmg1L-EPZ2MRqRyGCXWpuev7/view?usp=sharing)
 
-This repository contains the official implementation and dataset for the research paper:
-
-**"Deep Rhetoric: A Qarīna-Aware Multi-Task Learning Framework for Hierarchical Analysis of Qur’anic Metaphor"**
 
 > **Note:**
 > This repository is designed to ensure the reproducibility of the experiments presented in the manuscript. It implements the specific hierarchical tasks (**Type, Origin, Functional Context**) and the **Qarīna-Aware Interaction Layer** described in the paper. 
